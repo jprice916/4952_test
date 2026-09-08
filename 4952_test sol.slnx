@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="4952_test/4952_test.csproj" />
+  <Project Path="DotnetWeb/DotnetWeb.csproj" />
+  <Project Path="dotnet_lib/dotnet_lib.csproj" />
+</Solution>

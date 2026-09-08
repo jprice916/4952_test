@@ -1,0 +1,11 @@
+﻿@page
+@model IndexModel
+@{
+    ViewData["Title"] = "Home page";
+}
+
+<div class="text-center">
+    <h1 class="display-4">Welcome to the Fall @Model.Year term</h1>
+    @ViewData["bcit"]
+    <p>@Model.Stu</p>
+</div>
