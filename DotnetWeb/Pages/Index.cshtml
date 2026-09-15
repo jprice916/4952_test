@@ -1,11 +1,338 @@
-﻿@page
+@page
 @model IndexModel
 @{
-    ViewData["Title"] = "Home page";
+    ViewData["Title"] = "PNG to GIF";
 }
 
-<div class="text-center">
-    <h1 class="display-4">Welcome to the Fall @Model.Year term</h1>
-    @ViewData["bcit"]
-    <p>@Model.Stu</p>
-</div>
+<canvas class="water-background" id="waterBackground" aria-hidden="true"></canvas>
+
+<section class="converter-shell">
+    <div class="converter-heading">
+        <p class="eyebrow">IMAGE TOOL</p>
+        <h1>Turn a thing into a.</h1>
+        <p class="intro">Upload a PNG and save it as a shareable GIF. Everything happens in your browser.</p>
+    </div>
+
+    <div class="converter-card">
+        <label class="upload-zone" id="uploadZone" for="pngInput">
+            <input id="pngInput" type="file" accept=".png,image/png" hidden />
+            <span class="upload-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                    <path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5" />
+                    <path d="M5 14v4.5A1.5 1.5 0 0 0 6.5 20h11a1.5 1.5 0 0 0 1.5-1.5V14" />
+                </svg>
+            </span>
+            <strong>Drop a PNG here</strong>
+            <span class="upload-hint">or <span class="upload-link">browse your files</span></span>
+            <span class="file-note">PNG files only</span>
+        </label>
+
+        <div class="status-message" id="statusMessage" role="status" aria-live="polite"></div>
+
+        <div class="result-panel" id="resultPanel" hidden>
+            <div class="result-preview">
+                <span class="preview-label">GIF PREVIEW</span>
+                <div class="preview-stage">
+                    <canvas id="previewCanvas"></canvas>
+                </div>
+            </div>
+            <div class="result-details">
+                <span class="preview-label">READY TO DOWNLOAD</span>
+                <h2 id="fileName">converted.gif</h2>
+                <p id="imageDetails">GIF image</p>
+                <a class="download-button" id="downloadButton" download="converted.gif" href="#">
+                    Download GIF
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 4v12m0 0 4-4m-4 4-4-4M5 20h14" />
+                    </svg>
+                </a>
+                <button class="reset-button" id="resetButton" type="button">Choose another PNG</button>
+            </div>
+        </div>
+    </div>
+
+    <p class="privacy-note">
+        <span aria-hidden="true">✦</span>
+        Your files never leave your device.
+    </p>
+</section>
+
+@section Scripts {
+    <script>
+        (() => {
+            const canvas = document.getElementById("waterBackground");
+            const context = canvas.getContext("2d");
+            const droplets = [];
+            const streams = [];
+            let width = 0;
+            let height = 0;
+            let animationFrame;
+
+            function resize() {
+                const ratio = Math.min(window.devicePixelRatio || 1, 2);
+                width = window.innerWidth;
+                height = window.innerHeight;
+                canvas.width = width * ratio;
+                canvas.height = height * ratio;
+                canvas.style.width = `${width}px`;
+                canvas.style.height = `${height}px`;
+                context.setTransform(ratio, 0, 0, ratio, 0, 0);
+            }
+
+            function setupStreams() {
+                streams.length = 0;
+                const count = Math.max(9, Math.floor(width / 110));
+                for (let index = 0; index < count; index++) {
+                    streams.push({
+                        x: (index + 0.5) * width / count + (Math.random() - 0.5) * 38,
+                        width: 10 + Math.random() * 25,
+                        speed: 0.35 + Math.random() * 0.8,
+                        phase: Math.random() * Math.PI * 2,
+                        opacity: 0.18 + Math.random() * 0.2
+                    });
+                }
+            }
+
+            function addDroplets(x, y, strength = 1) {
+                for (let index = 0; index < 4 * strength; index++) {
+                    droplets.push({
+                        x: x + (Math.random() - 0.5) * 35,
+                        y,
+                        speed: 1 + Math.random() * 2,
+                        size: 1 + Math.random() * 2,
+                        opacity: 0.3 + Math.random() * 0.35
+                    });
+                }
+                if (droplets.length > 80) droplets.splice(0, droplets.length - 80);
+            }
+
+            function draw(time) {
+                context.clearRect(0, 0, width, height);
+                const gradient = context.createLinearGradient(0, 0, 0, height);
+                gradient.addColorStop(0, "#d9e4ee");
+                gradient.addColorStop(0.55, "#c9dce5");
+                gradient.addColorStop(1, "#a9cad3");
+                context.fillStyle = gradient;
+                context.fillRect(0, 0, width, height);
+
+                const cliffGradient = context.createLinearGradient(0, 0, width, 0);
+                cliffGradient.addColorStop(0, "rgba(42, 61, 72, .27)");
+                cliffGradient.addColorStop(.5, "rgba(75, 105, 114, .08)");
+                cliffGradient.addColorStop(1, "rgba(30, 51, 63, .25)");
+                context.fillStyle = cliffGradient;
+                context.fillRect(0, 0, width, height * .78);
+
+                context.globalCompositeOperation = "screen";
+                for (const stream of streams) {
+                    const wobble = Math.sin(time * .001 * stream.speed + stream.phase) * 18;
+                    const x = stream.x + wobble;
+                    const streamGradient = context.createLinearGradient(x, 0, x, height * .82);
+                    streamGradient.addColorStop(0, `rgba(240, 252, 255, ${stream.opacity})`);
+                    streamGradient.addColorStop(.7, `rgba(204, 239, 248, ${stream.opacity * .75})`);
+                    streamGradient.addColorStop(1, "rgba(180, 223, 234, 0)");
+                    context.fillStyle = streamGradient;
+                    context.beginPath();
+                    context.moveTo(x - stream.width, 0);
+                    context.bezierCurveTo(x - stream.width * .6, height * .28, x + stream.width * .8, height * .5, x, height * .82);
+                    context.bezierCurveTo(x - stream.width * .8, height * .55, x - stream.width * .7, height * .25, x - stream.width, 0);
+                    context.fill();
+
+                    context.beginPath();
+                    for (let line = -2; line <= 2; line++) {
+                        const lineX = x + line * stream.width * .28;
+                        context.moveTo(lineX, 0);
+                        context.bezierCurveTo(
+                            lineX - 8, height * .3,
+                            lineX + Math.sin(time * .001 + line) * 15, height * .6,
+                            x + line * 2, height * .82
+                        );
+                    }
+                    context.strokeStyle = "rgba(255, 255, 255, .3)";
+                    context.lineWidth = 1.5;
+                    context.stroke();
+                }
+
+                context.globalCompositeOperation = "source-over";
+                const mist = context.createRadialGradient(width * .5, height * .78, 0, width * .5, height * .78, width * .38);
+                mist.addColorStop(0, "rgba(255, 255, 255, .42)");
+                mist.addColorStop(1, "rgba(255, 255, 255, 0)");
+                context.fillStyle = mist;
+                context.fillRect(0, height * .55, width, height * .45);
+
+                context.fillStyle = "rgba(255, 255, 255, .32)";
+                context.beginPath();
+                context.ellipse(width * .5, height * .82, width * .3, height * .045, 0, 0, Math.PI * 2);
+                context.fill();
+
+                for (const droplet of droplets) {
+                    droplet.y += droplet.speed;
+                    droplet.opacity -= .006;
+                    context.beginPath();
+                    context.arc(droplet.x, droplet.y, droplet.size, 0, Math.PI * 2);
+                    context.fillStyle = `rgba(255, 255, 255, ${droplet.opacity})`;
+                    context.fill();
+                }
+                for (let index = droplets.length - 1; index >= 0; index--) {
+                    if (droplets[index].opacity <= 0 || droplets[index].y > height) droplets.splice(index, 1);
+                }
+
+                animationFrame = requestAnimationFrame(draw);
+            }
+
+            window.addEventListener("resize", () => {
+                resize();
+                setupStreams();
+            });
+            window.addEventListener("pointermove", (event) => {
+                if (Math.random() < 0.06) addDroplets(event.clientX, event.clientY, .5);
+            }, { passive: true });
+            window.addEventListener("pointerdown", (event) => addDroplets(event.clientX, event.clientY, 2), { passive: true });
+            resize();
+            setupStreams();
+            animationFrame = requestAnimationFrame(draw);
+        })();
+
+        (() => {
+            const input = document.getElementById("pngInput");
+            const zone = document.getElementById("uploadZone");
+            const canvas = document.getElementById("previewCanvas");
+            const resultPanel = document.getElementById("resultPanel");
+            const status = document.getElementById("statusMessage");
+            const download = document.getElementById("downloadButton");
+            const reset = document.getElementById("resetButton");
+            const fileName = document.getElementById("fileName");
+            const imageDetails = document.getElementById("imageDetails");
+            let sourceUrl = null;
+            let gifUrl = null;
+
+            function showError(message) {
+                status.textContent = message;
+                status.className = "status-message error";
+            }
+
+            function clearUrls() {
+                if (sourceUrl) URL.revokeObjectURL(sourceUrl);
+                if (gifUrl) URL.revokeObjectURL(gifUrl);
+                sourceUrl = null;
+                gifUrl = null;
+            }
+
+            function resetConverter() {
+                clearUrls();
+                input.value = "";
+                resultPanel.hidden = true;
+                status.textContent = "";
+                status.className = "status-message";
+                canvas.removeAttribute("width");
+                canvas.removeAttribute("height");
+            }
+
+            function encodeGif(width, height, pixels) {
+                const bytes = [];
+                const write = (...values) => bytes.push(...values);
+                const writeString = (value) => [...value].forEach((character) => bytes.push(character.charCodeAt(0)));
+                const writeShort = (value) => write(value & 255, (value >> 8) & 255);
+
+                writeString("GIF89a");
+                writeShort(width);
+                writeShort(height);
+                write(0xf7, 0, 0);
+
+                for (let index = 0; index < 256; index++) {
+                    write((index & 0xe0), (index & 0x1c) << 3, (index & 0x03) << 6);
+                }
+
+                write(0x2c, 0, 0, 0, 0, 0);
+                writeShort(width);
+                writeShort(height);
+                write(0);
+                write(8);
+
+                const codes = [];
+                for (let offset = 0; offset < pixels.length; offset += 4) {
+                    if (offset % (4 * 200) === 0) codes.push(256);
+                    const red = pixels[offset];
+                    const green = pixels[offset + 1];
+                    const blue = pixels[offset + 2];
+                    codes.push((red & 0xe0) | ((green & 0xe0) >> 3) | ((blue & 0xc0) >> 6));
+                }
+                codes.push(257);
+
+                const compressed = [];
+                let bitBuffer = 0;
+                let bitCount = 0;
+                for (const code of codes) {
+                    bitBuffer |= code << bitCount;
+                    bitCount += 9;
+                    while (bitCount >= 8) {
+                        compressed.push(bitBuffer & 255);
+                        bitBuffer >>= 8;
+                        bitCount -= 8;
+                    }
+                }
+                if (bitCount > 0) compressed.push(bitBuffer & 255);
+
+                for (let offset = 0; offset < compressed.length; offset += 255) {
+                    const block = compressed.slice(offset, offset + 255);
+                    write(block.length, ...block);
+                }
+                write(0, 0x3b);
+                return new Uint8Array(bytes);
+            }
+
+            function convert(file) {
+                if (!file || (file.type !== "image/png" && !/\.png$/i.test(file.name))) {
+                    showError("Please choose a PNG file to continue.");
+                    return;
+                }
+
+                clearUrls();
+                status.textContent = "Converting your PNG…";
+                status.className = "status-message loading";
+
+                sourceUrl = URL.createObjectURL(file);
+                const image = new Image();
+                image.onload = () => {
+                    canvas.width = image.naturalWidth;
+                    canvas.height = image.naturalHeight;
+                    const context = canvas.getContext("2d");
+                    context.clearRect(0, 0, canvas.width, canvas.height);
+                    context.fillStyle = "#ffffff";
+                    context.fillRect(0, 0, canvas.width, canvas.height);
+                    context.drawImage(image, 0, 0);
+
+                    const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+                    const gifBlob = new Blob([encodeGif(canvas.width, canvas.height, imageData.data)], { type: "image/gif" });
+                    gifUrl = URL.createObjectURL(gifBlob);
+                    const baseName = file.name.replace(/\.png$/i, "") || "converted";
+                    fileName.textContent = `${baseName}.gif`;
+                    imageDetails.textContent = `${image.naturalWidth} × ${image.naturalHeight} px`;
+                    download.href = gifUrl;
+                    download.download = `${baseName}.gif`;
+                    resultPanel.hidden = false;
+                    status.textContent = "";
+                    status.className = "status-message";
+                };
+                image.onerror = () => showError("That PNG could not be read. Please try another file.");
+                image.src = sourceUrl;
+            }
+
+            input.addEventListener("change", () => convert(input.files[0]));
+            reset.addEventListener("click", resetConverter);
+
+            ["dragenter", "dragover"].forEach((eventName) => {
+                zone.addEventListener(eventName, (event) => {
+                    event.preventDefault();
+                    zone.classList.add("is-dragging");
+                });
+            });
+            ["dragleave", "drop"].forEach((eventName) => {
+                zone.addEventListener(eventName, (event) => {
+                    event.preventDefault();
+                    zone.classList.remove("is-dragging");
+                });
+            });
+            zone.addEventListener("drop", (event) => convert(event.dataTransfer.files[0]));
+        })();
+    </script>
+}
